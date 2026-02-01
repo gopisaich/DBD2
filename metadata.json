@@ -1,0 +1,5 @@
+{
+  "name": "SUBZS",
+  "description": "A sleek, mobile-optimized subscription manager that tracks your recurring payments, calculates monthly spend, and provides smart reminders before your bills are due.",
+  "requestFramePermissions": []
+}
