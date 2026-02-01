@@ -1,6 +1,6 @@
 
 {
-  "name": "SUBZS Subscription Tracker",
+  "name": "SUBZS",
   "short_name": "SUBZS",
   "description": "Track your Indian subscriptions and get renewal alerts.",
   "start_url": "./index.html",

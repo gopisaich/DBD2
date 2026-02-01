@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Plus, Bell, Wallet, Sparkles, ArrowRight, WifiOff, LayoutDashboard, Search, History, List, Hourglass, Home, Filter, Volume2 } from 'lucide-react';
+import { Plus, Bell, Wallet, Sparkles, ArrowRight, WifiOff, LayoutDashboard, Search, History, List, Hourglass, Home, Filter, Volume2, CheckCircle, AlertTriangle } from 'lucide-react';
 import { Subscription, DEFAULT_CATEGORIES } from './types';
 import SubscriptionForm from './components/SubscriptionForm';
 import SubscriptionCard from './components/SubscriptionCard';
@@ -32,9 +32,12 @@ const App: React.FC = () => {
   const [subToDelete, setSubToDelete] = useState<Subscription | null>(null);
   const [showSplash, setShowSplash] = useState(true);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [permission, setPermission] = useState<NotificationPermission>('default');
+  const [permission, setPermission] = useState<NotificationPermission>(
+    'Notification' in window ? Notification.permission : 'default'
+  );
   const [geminiAdvice, setGeminiAdvice] = useState<string | null>(null);
   const [isLoadingAdvice, setIsLoadingAdvice] = useState(false);
+  const [testMode, setTestMode] = useState(false);
 
   const allCategories = useMemo(() => {
     const fromSubs = subscriptions.map(s => s.category);
@@ -56,18 +59,62 @@ const App: React.FC = () => {
       if (savedCats) setCustomCategories(JSON.parse(savedCats));
     } catch (e) { console.error(e); }
     
-    if ('Notification' in window) setPermission(Notification.permission);
-
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
 
+  const sendNotification = useCallback((title: string, body: string, icon: string) => {
+    if (permission !== 'granted') return;
+
+    const options = {
+      body,
+      icon,
+      badge: icon,
+      vibrate: [200, 100, 200]
+    };
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.ready.then((registration) => {
+        registration.showNotification(title, options);
+      });
+    } else {
+      new Notification(title, options);
+    }
+  }, [permission]);
+
+  const checkUpcomingRenewals = useCallback(() => {
+    if (permission !== 'granted') return;
+
+    const today = new Date();
+    subscriptions.forEach(sub => {
+      if (sub.isArchived) return;
+      const renewalDate = new Date(sub.renewalDate);
+      const reminderDate = new Date(renewalDate);
+      reminderDate.setDate(renewalDate.getDate() - sub.reminderDays);
+
+      if (today.toDateString() === reminderDate.toDateString()) {
+        sendNotification(
+          'SUBZS Reminder',
+          `Your ${sub.name} subscription renews in ${sub.reminderDays} day(s)!`,
+          sub.logoUrl || 'https://img.icons8.com/fluency/128/null/recurring-appointment.png'
+        );
+
+        if (sub.soundTone && SOUNDS[sub.soundTone]) {
+          const audio = new Audio(SOUNDS[sub.soundTone]);
+          audio.play().catch(e => console.debug('Audio auto-play prevented. Typically needs user interaction once per session.', e));
+        }
+      }
+    });
+  }, [subscriptions, permission, sendNotification]);
+
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(subscriptions));
-    checkUpcomingRenewals();
-  }, [subscriptions]);
+    // Small delay to ensure state is settled before checking renewals
+    const timer = setTimeout(checkUpcomingRenewals, 1000);
+    return () => clearTimeout(timer);
+  }, [subscriptions, checkUpcomingRenewals]);
 
   useEffect(() => {
     localStorage.setItem(CAT_STORAGE_KEY, JSON.stringify(customCategories));
@@ -80,41 +127,47 @@ const App: React.FC = () => {
   const requestPermission = async () => {
     vibrate(25);
     if ('Notification' in window) {
-      const res = await Notification.requestPermission();
-      setPermission(res);
+      try {
+        const res = await Notification.requestPermission();
+        setPermission(res);
+        if (res === 'granted') {
+          sendNotification(
+            'SUBZS Alerts Enabled!',
+            'You will now receive smart reminders before your bills are due.',
+            'https://img.icons8.com/fluency/128/null/recurring-appointment.png'
+          );
+        }
+      } catch (err) {
+        console.error("Error requesting notification permission:", err);
+      }
     }
   };
 
-  const checkUpcomingRenewals = useCallback(() => {
-    const today = new Date();
-    subscriptions.forEach(sub => {
-      if (sub.isArchived) return;
-      const renewalDate = new Date(sub.renewalDate);
-      const reminderDate = new Date(renewalDate);
-      reminderDate.setDate(renewalDate.getDate() - sub.reminderDays);
+  const handleTestNotification = () => {
+    vibrate([50, 50, 50]);
+    if (permission !== 'granted') {
+      requestPermission();
+      return;
+    }
 
-      if (today.toDateString() === reminderDate.toDateString()) {
-        if (permission === 'granted') {
-          new Notification('Renewal Reminder', {
-            body: `Your ${sub.name} subscription renews in ${sub.reminderDays} day(s)!`,
-            icon: sub.logoUrl || 'https://img.icons8.com/fluency/128/null/recurring-appointment.png'
-          });
-        }
+    sendNotification(
+      'SUBZS: Test Alert',
+      'Brilliant! This is how your renewal alerts will appear.',
+      'https://img.icons8.com/fluency/128/null/recurring-appointment.png'
+    );
 
-        if (sub.soundTone && SOUNDS[sub.soundTone]) {
-          const audio = new Audio(SOUNDS[sub.soundTone]);
-          audio.play().catch(e => console.log('Audio play failed:', e));
-        }
-      }
-    });
-  }, [subscriptions, permission]);
+    const audio = new Audio(SOUNDS['Digital']);
+    audio.play().catch(e => console.error('Sound play failed - user must interact with page first.', e));
+    
+    setTestMode(true);
+    setTimeout(() => setTestMode(false), 3000);
+  };
 
   const handleFixLogo = async (subId: string) => {
     const sub = subscriptions.find(s => s.id === subId);
     if (!sub || !isOnline) return;
 
     try {
-      // Initialize Gemini SDK with the API key from environment variables
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
@@ -122,14 +175,7 @@ const App: React.FC = () => {
         config: { tools: [{ googleSearch: {} }] }
       });
 
-      // Directly access the .text property as per GenerateContentResponse guidelines
       const url = response.text?.trim();
-      
-      // Compliance: Always check and handle grounding metadata when using Google Search
-      if (response.candidates?.[0]?.groundingMetadata?.groundingChunks) {
-        console.debug('Logo search sources:', response.candidates[0].groundingMetadata.groundingChunks);
-      }
-
       if (url && url.startsWith('http')) {
         setSubscriptions(prev => prev.map(s => s.id === subId ? { ...s, logoUrl: url } : s));
         vibrate(20);
@@ -228,17 +274,15 @@ const App: React.FC = () => {
     vibrate(12);
     setIsLoadingAdvice(true);
     try {
-      // Re-initialize for fresh request handling
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const subList = activeSubscriptions.map(s => `${s.name}: ₹${s.price}`).join(', ');
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: `My subscriptions: ${subList}. Give a short, 1-sentence witty money-saving advice for an Indian user. Keep it brief.`,
         config: { 
-          thinkingConfig: { thinkingBudget: 0 } // Disabling thinking for lower latency on simple text tasks
+          thinkingConfig: { thinkingBudget: 0 }
         }
       });
-      // Correct property access for extracted text content
       setGeminiAdvice(response.text || "Budget wisely and save more!");
     } catch (err) {
       console.error('Gemini Advice error:', err);
@@ -271,10 +315,14 @@ const App: React.FC = () => {
           </div>
         </div>
         
-        {permission !== 'granted' && (subscriptions.length > 0) && (
-          <button onClick={requestPermission} className="bg-white/50 text-indigo-600 px-4 py-2 rounded-2xl flex items-center gap-2 font-bold text-xs border border-white/80 active:scale-95 transition-transform shadow-sm">
-            <Bell size={14} /> Alerts
+        {permission !== 'granted' ? (
+          <button onClick={requestPermission} className="bg-indigo-50 text-indigo-600 px-4 py-2 rounded-2xl flex items-center gap-2 font-black text-[10px] uppercase tracking-widest border border-indigo-100 active:scale-95 transition-transform shadow-sm">
+            <Bell size={14} className="animate-swing" /> Enable Alerts
           </button>
+        ) : (
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-100 font-black text-[9px] uppercase tracking-[0.1em]">
+            <CheckCircle size={12} fill="currentColor" className="text-emerald-100" /> Alerts On
+          </div>
         )}
       </header>
 
@@ -305,8 +353,30 @@ const App: React.FC = () => {
                   </div>
                 )}
 
-                <div className="bg-white p-6 rounded-[32px] shadow-sm border border-white space-y-4">
-                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest px-1">Quick Insights</h3>
+                <div className="bg-white p-6 rounded-[32px] shadow-sm border border-white space-y-6">
+                  <div className="flex items-center justify-between px-1">
+                    <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Quick Insights</h3>
+                    {permission === 'granted' && (
+                      <button 
+                        onClick={handleTestNotification}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-black text-[9px] uppercase tracking-widest transition-all ${testMode ? 'bg-indigo-600 text-white shadow-lg' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}
+                      >
+                        {testMode ? <CheckCircle size={12} /> : <Volume2 size={12} />}
+                        {testMode ? 'Sent!' : 'Test Alert'}
+                      </button>
+                    )}
+                  </div>
+
+                  {permission === 'denied' && (
+                    <div className="bg-rose-50 border border-rose-100 p-4 rounded-2xl flex items-start gap-3">
+                      <AlertTriangle size={18} className="text-rose-500 shrink-0 mt-0.5" />
+                      <div className="space-y-1">
+                        <p className="text-[11px] font-black text-rose-900 uppercase tracking-tight">Alerts Blocked</p>
+                        <p className="text-[10px] font-bold text-rose-600/80 leading-relaxed">Notifications are disabled in your browser settings. Please enable them to get bill reminders.</p>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-2 gap-4">
                     <div className="bg-slate-50 p-4 rounded-2xl cursor-pointer active:scale-95 transition-transform" onClick={() => { setMainTab('lifecycle'); setLifecycleSubTab('ending'); }}>
                       <div className="text-[9px] font-black text-slate-400 uppercase mb-1">Ending Soon</div>
@@ -462,7 +532,7 @@ const App: React.FC = () => {
             className={`flex flex-col items-center gap-1 transition-all ${mainTab === 'lifecycle' && lifecycleSubTab === 'ending' ? 'text-indigo-600 scale-110' : 'text-slate-400'}`}
           >
             <Hourglass size={22} strokeWidth={mainTab === 'lifecycle' && lifecycleSubTab === 'ending' ? 2.5 : 2} />
-            <span className="text-[9px] font-black uppercase tracking-widest">Ending</span>
+            <span className="text-[9px] font-black uppercase tracking-widest">Soon</span>
           </button>
 
           <button 
