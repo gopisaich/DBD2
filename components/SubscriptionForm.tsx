@@ -1,8 +1,22 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Calendar as CalendarIcon, Zap, ChevronLeft, Search, Globe, Plus, RefreshCw, CheckCircle2, Repeat } from 'lucide-react';
+import { X, Calendar as CalendarIcon, Zap, ChevronLeft, Search, Globe, Plus, RefreshCw, CheckCircle2, Repeat, Filter } from 'lucide-react';
 import { Subscription, BillingCycle } from '../types';
 import { GoogleGenAI } from "@google/genai";
+
+interface Plan {
+  name: string;
+  price: string;
+  type: BillingCycle;
+}
+
+interface Service {
+  name: string;
+  color: string;
+  category: string;
+  logoUrl: string;
+  plans: Plan[];
+}
 
 interface Props {
   onSubmit: (sub: Subscription) => void;
@@ -23,7 +37,32 @@ const CYCLES: { id: BillingCycle; label: string }[] = [
   { id: 'One-time', label: '1x' }
 ];
 
-// --- Custom Calendar Component (Simplified for brevity as it works well) ---
+const POPULAR_SERVICES_DATA: Service[] = [
+  // Entertainment
+  { name: 'Netflix', color: '#E50914', category: 'Entertainment', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/f/ff/Netflix-new-icon.png', plans: [{ name: 'Basic', price: '199', type: 'Monthly' }, { name: 'Standard', price: '499', type: 'Monthly' }, { name: 'Premium', price: '649', type: 'Monthly' }] },
+  { name: 'Spotify', color: '#1DB954', category: 'Entertainment', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/1/19/Spotify_logo_without_text.svg', plans: [{ name: 'Individual', price: '119', type: 'Monthly' }, { name: 'Family', price: '179', type: 'Monthly' }] },
+  { name: 'YouTube', color: '#FF0000', category: 'Entertainment', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/0/09/YouTube_full-color_icon_%282017%29.svg', plans: [{ name: 'Premium', price: '139', type: 'Monthly' }] },
+  { name: 'Disney+', color: '#006E99', category: 'Entertainment', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/3/3e/Disney%2B_Hotstar_logo.svg', plans: [{ name: 'Super', price: '899', type: 'Yearly' }, { name: 'Premium', price: '1499', type: 'Yearly' }] },
+  { name: 'Prime Video', color: '#00A8E1', category: 'Entertainment', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/1/11/Amazon_Prime_Video_logo.svg', plans: [{ name: 'Monthly', price: '299', type: 'Monthly' }, { name: 'Annual', price: '1499', type: 'Yearly' }] },
+  
+  // Gaming
+  { name: 'Xbox Pass', color: '#107C10', category: 'Gaming', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/f/f9/Xbox_one_logo.svg', plans: [{ name: 'Ultimate', price: '549', type: 'Monthly' }] },
+  { name: 'PlayStation Plus', color: '#003087', category: 'Gaming', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/0/00/PlayStation_Plus_logo_2022.svg', plans: [{ name: 'Essential', price: '499', type: 'Monthly' }] },
+  { name: 'Discord Nitro', color: '#5865F2', category: 'Gaming', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/7/73/Discord_Color_Logo.svg', plans: [{ name: 'Nitro', price: '299', type: 'Monthly' }] },
+  
+  // Education
+  { name: 'Duolingo', color: '#58CC02', category: 'Education', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/1/15/Duolingo_logo_%282019%29.svg', plans: [{ name: 'Super', price: '129', type: 'Monthly' }] },
+  { name: 'Skillshare', color: '#00ff84', category: 'Education', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/c/c1/Skillshare_logo_2020.svg', plans: [{ name: 'Annual', price: '4000', type: 'Yearly' }] },
+  { name: 'Coursera', color: '#0056D2', category: 'Education', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/9/97/Coursera-Logo_600x600.svg', plans: [{ name: 'Plus', price: '4999', type: 'Yearly' }] },
+
+  // Lifestyle / Utility
+  { name: 'Jio', color: '#0a288f', category: 'Lifestyle', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/b/bf/Reliance_Jio_Logo.svg', plans: [{ name: 'Monthly', price: '299', type: 'Monthly' }] },
+  { name: 'Airtel', color: '#e40000', category: 'Lifestyle', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/3/3a/Airtel_logo-01.png', plans: [{ name: 'Monthly', price: '299', type: 'Monthly' }] },
+  { name: 'Swiggy One', color: '#FC8019', category: 'Lifestyle', logoUrl: 'https://upload.wikimedia.org/wikipedia/en/thumb/1/12/Swiggy_logo.svg/1200px-Swiggy_logo.svg.png', plans: [{ name: 'Quarterly', price: '299', type: 'Quarterly' }] },
+  { name: 'Zomato Gold', color: '#CB202D', category: 'Lifestyle', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/75/Zomato_logo.png/600px-Zomato_logo.png', plans: [{ name: 'Quarterly', price: '299', type: 'Quarterly' }] }
+];
+
+// --- Custom Calendar Component ---
 interface CalendarPickerProps {
   value: string;
   onChange: (date: string) => void;
@@ -103,6 +142,10 @@ const SubscriptionForm: React.FC<Props> = ({ onSubmit, onClose, initialData, cat
   const [isSearchingLogo, setIsSearchingLogo] = useState(false);
   const [activePicker, setActivePicker] = useState<'start' | 'end' | null>(null);
 
+  // New states for categorized search
+  const [popularSearch, setPopularSearch] = useState('');
+  const [selectedService, setSelectedService] = useState<Service | null>(null);
+
   useEffect(() => {
     if (!startDate || !billingCycle) return;
     const start = new Date(startDate);
@@ -124,6 +167,21 @@ const SubscriptionForm: React.FC<Props> = ({ onSubmit, onClose, initialData, cat
     }
   }, [startDate, billingCycle]);
 
+  const filteredPopularServices = useMemo(() => {
+    const search = popularSearch.toLowerCase().trim();
+    const services = search 
+      ? POPULAR_SERVICES_DATA.filter(s => s.name.toLowerCase().includes(search) || s.category.toLowerCase().includes(search))
+      : POPULAR_SERVICES_DATA;
+
+    // Group by category
+    const grouped: Record<string, Service[]> = {};
+    services.forEach(s => {
+      if (!grouped[s.category]) grouped[s.category] = [];
+      grouped[s.category].push(s);
+    });
+    return grouped;
+  }, [popularSearch]);
+
   const vibrate = (ms: number = 10) => { if ('vibrate' in navigator) navigator.vibrate(ms); };
 
   const handleSearchLogo = async () => {
@@ -139,6 +197,24 @@ const SubscriptionForm: React.FC<Props> = ({ onSubmit, onClose, initialData, cat
       const url = response.text?.trim();
       if (url && url.startsWith('http')) setLogoUrl(url);
     } catch (e) { console.error(e); } finally { setIsSearchingLogo(false); }
+  };
+
+  const handleSelectService = (service: Service) => {
+    vibrate(12);
+    setSelectedService(service);
+  };
+
+  const handleSelectPlan = (plan: Plan) => {
+    if (!selectedService) return;
+    vibrate(20);
+    setName(`${selectedService.name} ${plan.name}`);
+    setPrice(plan.price);
+    setBillingCycle(plan.type);
+    setCategory(selectedService.category);
+    setColor(selectedService.color);
+    setLogoUrl(selectedService.logoUrl);
+    setSelectedService(null);
+    setPopularSearch('');
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -167,15 +243,15 @@ const SubscriptionForm: React.FC<Props> = ({ onSubmit, onClose, initialData, cat
       <div className="w-full max-w-lg bg-white rounded-t-[40px] sm:rounded-[40px] shadow-2xl animate-in slide-in-from-bottom duration-500 max-h-[96vh] flex flex-col">
         <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mt-4 mb-2" />
         <div className="flex items-center justify-between px-8 py-4 border-b border-slate-50">
-          <h2 className="text-2xl font-black text-slate-900 tracking-tight">{initialData ? 'Update Plan' : 'New Subscription'}</h2>
+          <h2 className="text-2xl font-black text-slate-900 tracking-tight">{initialData ? 'Edit Plan' : selectedService ? 'Choose Plan' : 'Add Tracking'}</h2>
           <button onClick={onClose} className="p-3 bg-slate-100 rounded-full text-slate-500 active:scale-90 transition-transform"><X size={20} /></button>
         </div>
 
-        <div className="p-8 space-y-8 overflow-y-auto pb-12 scrollbar-hide relative">
+        <div className="p-8 space-y-8 overflow-y-auto pb-12 scrollbar-hide relative flex-1">
           {activePicker && (
             <div className="absolute inset-0 z-[60] bg-white/95 backdrop-blur-sm flex items-center justify-center p-6">
               <CustomCalendarPicker 
-                label={activePicker === 'start' ? 'Last Payment Date' : 'Renewal Due'}
+                label={activePicker === 'start' ? 'First Payment' : 'Renewal Due'}
                 value={activePicker === 'start' ? startDate : endDate}
                 onChange={(d) => activePicker === 'start' ? setStartDate(d) : setEndDate(d)}
                 onClose={() => setActivePicker(null)}
@@ -183,7 +259,115 @@ const SubscriptionForm: React.FC<Props> = ({ onSubmit, onClose, initialData, cat
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Popular Services Quick Selection - Only show if not editing or plan selected */}
+          {!initialData && !selectedService && (
+            <div className="space-y-6">
+              <div className="relative group">
+                <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none text-slate-400 group-focus-within:text-indigo-500 transition-colors">
+                  <Search size={18} />
+                </div>
+                <input 
+                  type="text" 
+                  placeholder="Find popular apps..." 
+                  value={popularSearch} 
+                  onChange={(e) => setPopularSearch(e.target.value)} 
+                  className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl py-4 pl-12 pr-6 text-sm font-bold text-slate-800 outline-none focus:border-indigo-500 focus:bg-white transition-all" 
+                />
+              </div>
+
+              <div className="space-y-8">
+                {Object.entries(filteredPopularServices).length > 0 ? (
+                  Object.entries(filteredPopularServices).map(([cat, services]) => (
+                    <div key={cat} className="space-y-4">
+                      <div className="flex items-center justify-between px-2">
+                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{cat}</h3>
+                        <span className="text-[9px] font-bold text-slate-300">{services.length} APPS</span>
+                      </div>
+                      <div className="grid grid-cols-4 gap-4">
+                        {services.map(s => (
+                          <button 
+                            key={s.name} 
+                            type="button" 
+                            onClick={() => handleSelectService(s)}
+                            className="flex flex-col items-center gap-2 group active:scale-90 transition-transform"
+                          >
+                            <div className="w-14 h-14 rounded-2xl border-2 border-slate-100 bg-white p-2.5 shadow-sm group-hover:border-indigo-200 transition-colors flex items-center justify-center overflow-hidden">
+                              <img src={s.logoUrl} alt={s.name} className="w-full h-full object-contain" />
+                            </div>
+                            <span className="text-[9px] font-black text-slate-600 truncate w-full text-center uppercase tracking-tighter">{s.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="py-12 text-center">
+                    <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-4 text-slate-200 border-2 border-dashed border-slate-100">
+                      <Plus size={24} />
+                    </div>
+                    <p className="text-slate-400 text-xs font-bold italic">No matching apps? Add custom below.</p>
+                  </div>
+                )}
+                
+                {/* Custom Add Trigger */}
+                {!popularSearch && (
+                  <button 
+                    type="button"
+                    onClick={() => { vibrate(5); setPopularSearch(' '); }} // Trick to show custom state or focus form
+                    className="w-full py-4 rounded-2xl border-2 border-dashed border-indigo-100 bg-indigo-50/30 text-indigo-500 text-[10px] font-black uppercase tracking-widest hover:bg-indigo-50 transition-colors"
+                  >
+                    + Add Unlisted Service
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Plan selection for selected service */}
+          {selectedService && (
+             <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
+                <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-3xl border border-slate-100">
+                   <div className="w-12 h-12 bg-white rounded-xl p-2 shadow-sm border border-slate-100">
+                      <img src={selectedService.logoUrl} className="w-full h-full object-contain" />
+                   </div>
+                   <div className="flex-1">
+                      <h3 className="font-black text-slate-800 text-lg">{selectedService.name}</h3>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{selectedService.category}</p>
+                   </div>
+                   <button onClick={() => setSelectedService(null)} className="text-indigo-600 font-black text-[10px] uppercase tracking-widest">Cancel</button>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3">
+                   {selectedService.plans.map((p, i) => (
+                      <button 
+                        key={i} 
+                        onClick={() => handleSelectPlan(p)}
+                        className="flex items-center justify-between bg-white border-2 border-slate-100 rounded-2xl p-5 text-left hover:border-indigo-500 hover:shadow-md transition-all group"
+                      >
+                         <div>
+                            <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest block mb-1">{p.type}</span>
+                            <span className="font-extrabold text-slate-800 text-lg">{p.name}</span>
+                         </div>
+                         <div className="text-right">
+                            <span className="font-black text-indigo-600 text-xl tracking-tighter">₹{p.price}</span>
+                            <span className="block text-slate-300 group-hover:text-indigo-300"><CheckCircle2 size={18} /></span>
+                         </div>
+                      </button>
+                   ))}
+                </div>
+             </div>
+          )}
+
+          <form onSubmit={handleSubmit} className={`space-y-6 transition-all ${!initialData && !popularSearch && !selectedService ? 'hidden' : 'block'}`}>
+            {/* Form Divider */}
+            {!initialData && (
+              <div className="flex items-center gap-4 py-4">
+                <div className="h-px flex-1 bg-slate-100" />
+                <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Plan Details</span>
+                <div className="h-px flex-1 bg-slate-100" />
+              </div>
+            )}
+
             {/* Name and Logo */}
             <div className="flex items-center gap-6">
               <div className="w-20 h-20 rounded-[28px] border-2 border-dashed border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden relative group shrink-0">
@@ -206,51 +390,40 @@ const SubscriptionForm: React.FC<Props> = ({ onSubmit, onClose, initialData, cat
               </div>
             </div>
 
-            {/* Price and Cycle Segmented Control */}
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Price (₹)</label>
-                  <input type="number" value={price} onChange={e => setPrice(e.target.value)} className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-6 py-4 font-black text-slate-800 focus:border-indigo-500 outline-none" placeholder="0" required />
-                </div>
-                <div className="space-y-2">
-                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Billing Cycle</label>
-                   <div className="flex bg-slate-50 p-1 rounded-2xl border-2 border-slate-100">
-                      {CYCLES.slice(0, 4).map(c => (
-                        <button
-                          key={c.id}
-                          type="button"
-                          onClick={() => { vibrate(5); setBillingCycle(c.id); }}
-                          className={`flex-1 py-3 rounded-xl text-[10px] font-black transition-all ${billingCycle === c.id ? 'bg-white text-indigo-600 shadow-sm border border-slate-100' : 'text-slate-400'}`}
-                        >
-                          {c.label}
-                        </button>
-                      ))}
-                   </div>
-                </div>
+            {/* Price and Cycle */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Price (₹)</label>
+                <input type="number" value={price} onChange={e => setPrice(e.target.value)} className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-6 py-4 font-black text-slate-800 focus:border-indigo-500 outline-none" placeholder="0" required />
               </div>
-              
-              <button 
-                type="button" 
-                onClick={() => setBillingCycle('One-time')}
-                className={`w-full py-2.5 rounded-xl text-[10px] font-black border-2 transition-all ${billingCycle === 'One-time' ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-slate-50 border-slate-100 text-slate-400'}`}
-              >
-                {billingCycle === 'One-time' && <CheckCircle2 size={12} className="inline mr-1" />}
-                ONE-TIME PAYMENT
-              </button>
+              <div className="space-y-2">
+                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Billing Cycle</label>
+                 <div className="flex bg-slate-50 p-1 rounded-2xl border-2 border-slate-100">
+                    {CYCLES.slice(0, 4).map(c => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => { vibrate(5); setBillingCycle(c.id); }}
+                        className={`flex-1 py-3 rounded-xl text-[10px] font-black transition-all ${billingCycle === c.id ? 'bg-white text-indigo-600 shadow-sm border border-slate-100' : 'text-slate-400'}`}
+                      >
+                        {c.label}
+                      </button>
+                    ))}
+                 </div>
+              </div>
             </div>
 
             {/* Date Previews */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">First Payment</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Paid On</label>
                 <button type="button" onClick={() => setActivePicker('start')} className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-6 py-4 font-bold text-slate-800 flex justify-between items-center group active:scale-95 transition-transform">
-                  <span className="truncate">{new Date(startDate).toLocaleDateString('en-IN', {month:'short', day:'numeric', year:'numeric'})}</span>
+                  <span className="truncate">{new Date(startDate).toLocaleDateString('en-IN', {month:'short', day:'numeric'})}</span>
                   <CalendarIcon size={14} className="text-slate-400 group-hover:text-indigo-500" />
                 </button>
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Next Renewal</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Renews On</label>
                 <button 
                   type="button" 
                   disabled={billingCycle === 'One-time'}
@@ -270,7 +443,7 @@ const SubscriptionForm: React.FC<Props> = ({ onSubmit, onClose, initialData, cat
                     <select value={category} onChange={e => setCategory(e.target.value)} className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl px-6 py-4 font-bold text-slate-800 appearance-none outline-none focus:border-indigo-500">
                         {categories.map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
-                    <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400"><Plus size={16} className="rotate-45" /></div>
+                    <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400"><Filter size={14} /></div>
                  </div>
                  <div className="flex gap-1.5 bg-slate-50 border-2 border-slate-100 rounded-2xl p-2 items-center">
                    {COLORS.slice(0, 4).map(c => (
