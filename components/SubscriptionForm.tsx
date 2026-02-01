@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Calendar as CalendarIcon, Zap, ChevronLeft, Search, Globe, Plus, RefreshCw, CheckCircle2, Repeat, Filter, Bell, Gamepad2, Tv, BookOpen, Heart } from 'lucide-react';
+import { X, Calendar as CalendarIcon, Zap, ChevronLeft, Search, Globe, Plus, RefreshCw, CheckCircle2, Repeat, Filter, Bell, Gamepad2, Tv, BookOpen, Heart, Volume2, Play } from 'lucide-react';
 import { Subscription, BillingCycle } from '../types';
 import { GoogleGenAI } from "@google/genai";
 
@@ -39,6 +39,13 @@ const CYCLES: { id: BillingCycle; label: string }[] = [
 
 const REMINDER_OPTIONS = [1, 2, 3, 5, 7];
 
+const SOUNDS: Record<string, string> = {
+  'Digital': 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3',
+  'Bell': 'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3',
+  'Playful': 'https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3',
+  'Gentle': 'https://assets.mixkit.co/active_storage/sfx/2190/2190-preview.mp3',
+};
+
 const POPULAR_SERVICES_DATA: Service[] = [
   // Entertainment
   { name: 'Netflix', color: '#E50914', category: 'Entertainment', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/f/ff/Netflix-new-icon.png', plans: [{ name: 'Basic', price: '199', type: 'Monthly' }, { name: 'Standard', price: '499', type: 'Monthly' }, { name: 'Premium', price: '649', type: 'Monthly' }] },
@@ -52,8 +59,8 @@ const POPULAR_SERVICES_DATA: Service[] = [
   { name: 'Nitro', color: '#5865F2', category: 'Gaming', logoUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTYr0_EghY8vQv58_GOM0wzMc6Hobu7yiOQhA&s', plans: [{ name: 'Nitro', price: '299', type: 'Monthly' }] },
   
   // Education
-  { name: 'Duolingo', color: '#58CC02', category: 'Education', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/1/15/Duolingo_logo_%282019%29.svg', plans: [{ name: 'Super', price: '129', type: 'Monthly' }] },
-  { name: 'Skillshare', color: '#00ff84', category: 'Education', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/c/c1/Skillshare_logo_2020.svg', plans: [{ name: 'Annual', price: '4000', type: 'Yearly' }] },
+  { name: 'Duolingo', color: '#58CC02', category: 'Education', logoUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQoMND2ySDTkYbjPn4cP-t8QJ6vttarxP7WQQ&s', plans: [{ name: 'Super', price: '129', type: 'Monthly' }] },
+  { name: 'Skillshare', color: '#00ff84', category: 'Education', logoUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQorEdsIXWIr5n_sCWgX0kj0aXLf_OISQu-MA&s', plans: [{ name: 'Annual', price: '4000', type: 'Yearly' }] },
   { name: 'Coursera', color: '#0056D2', category: 'Education', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/9/97/Coursera-Logo_600x600.svg', plans: [{ name: 'Plus', price: '4999', type: 'Yearly' }] },
 
   // Lifestyle
@@ -136,6 +143,7 @@ const SubscriptionForm: React.FC<Props> = ({ onSubmit, onClose, initialData, cat
   });
 
   const [reminder, setReminder] = useState(initialData?.reminderDays || 1);
+  const [soundTone, setSoundTone] = useState(initialData?.soundTone || 'Digital');
   const [category, setCategory] = useState<string>(initialData?.category || 'Entertainment');
   const [color, setColor] = useState(initialData?.color || COLORS[0]);
   const [logoUrl, setLogoUrl] = useState<string | undefined>(initialData?.logoUrl);
@@ -218,6 +226,12 @@ const SubscriptionForm: React.FC<Props> = ({ onSubmit, onClose, initialData, cat
     setIsManualEntry(true); // Switch to form view
   };
 
+  const playSoundPreview = (tone: string) => {
+    vibrate(10);
+    const audio = new Audio(SOUNDS[tone]);
+    audio.play().catch(e => console.log('Audio preview failed:', e));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !price) return;
@@ -232,6 +246,7 @@ const SubscriptionForm: React.FC<Props> = ({ onSubmit, onClose, initialData, cat
       endDate: new Date(endDate || startDate).toISOString(),
       billingCycle,
       reminderDays: reminder,
+      soundTone,
       category,
       color,
       logoUrl,
@@ -442,27 +457,59 @@ const SubscriptionForm: React.FC<Props> = ({ onSubmit, onClose, initialData, cat
               </div>
 
               {/* Final Alert Reminder Selection */}
-              <div className="space-y-3 bg-slate-50/50 p-6 rounded-[32px] border border-slate-100 shadow-inner">
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="w-8 h-8 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600">
-                    <Bell size={16} fill="currentColor" />
+              <div className="space-y-6 bg-slate-50/50 p-6 rounded-[32px] border border-slate-100 shadow-inner">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="w-8 h-8 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600">
+                      <Bell size={16} fill="currentColor" />
+                    </div>
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Alert me before</label>
                   </div>
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Alert me before</label>
+                  <div className="flex bg-slate-100/50 p-1.5 rounded-[22px] border-2 border-white/50">
+                    {REMINDER_OPTIONS.map(days => (
+                      <button
+                        key={days}
+                        type="button"
+                        onClick={() => { vibrate(5); setReminder(days); }}
+                        className={`flex-1 py-3 rounded-[18px] text-[10px] font-black transition-all ${reminder === days ? 'bg-white text-indigo-600 shadow-md border border-slate-100 scale-105 z-10' : 'text-slate-400 hover:text-slate-500'}`}
+                      >
+                        {days}D
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <div className="flex bg-slate-100/50 p-1.5 rounded-[22px] border-2 border-white/50">
-                  {REMINDER_OPTIONS.map(days => (
-                    <button
-                      key={days}
-                      type="button"
-                      onClick={() => { vibrate(5); setReminder(days); }}
-                      className={`flex-1 py-3 rounded-[18px] text-[10px] font-black transition-all ${reminder === days ? 'bg-white text-indigo-600 shadow-md border border-slate-100 scale-105 z-10' : 'text-slate-400 hover:text-slate-500'}`}
-                    >
-                      {days}D
-                    </button>
-                  ))}
+
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="w-8 h-8 bg-amber-100 rounded-xl flex items-center justify-center text-amber-600">
+                      <Volume2 size={16} />
+                    </div>
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Notification Tone</label>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {Object.keys(SOUNDS).map(tone => (
+                      <div key={tone} className={`flex items-center justify-between p-3 rounded-2xl border-2 transition-all ${soundTone === tone ? 'bg-white border-amber-400 shadow-sm' : 'bg-white/40 border-slate-100'}`}>
+                        <button 
+                          type="button" 
+                          onClick={() => { vibrate(5); setSoundTone(tone); }}
+                          className="flex-1 text-[10px] font-black uppercase text-left tracking-widest text-slate-700"
+                        >
+                          {tone}
+                        </button>
+                        <button 
+                          type="button" 
+                          onClick={() => playSoundPreview(tone)}
+                          className="p-1.5 bg-slate-100 rounded-lg text-slate-400 hover:text-indigo-600 active:scale-90 transition-all"
+                        >
+                          <Play size={10} fill="currentColor" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
+
                 <p className="text-[10px] font-bold text-slate-400 px-1 italic">
-                  Notification will arrive {reminder} day{reminder > 1 ? 's' : ''} before the renewal date.
+                  Notification will arrive {reminder} day{reminder > 1 ? 's' : ''} before with your chosen tone.
                 </p>
               </div>
 
