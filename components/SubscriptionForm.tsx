@@ -44,12 +44,12 @@ const POPULAR_SERVICES_DATA: Service[] = [
   { name: 'Netflix', color: '#E50914', category: 'Entertainment', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/f/ff/Netflix-new-icon.png', plans: [{ name: 'Basic', price: '199', type: 'Monthly' }, { name: 'Standard', price: '499', type: 'Monthly' }, { name: 'Premium', price: '649', type: 'Monthly' }] },
   { name: 'Spotify', color: '#1DB954', category: 'Entertainment', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/1/19/Spotify_logo_without_text.svg', plans: [{ name: 'Individual', price: '119', type: 'Monthly' }, { name: 'Family', price: '179', type: 'Monthly' }] },
   { name: 'YouTube', color: '#FF0000', category: 'Entertainment', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/0/09/YouTube_full-color_icon_%282017%29.svg', plans: [{ name: 'Premium', price: '139', type: 'Monthly' }] },
-  { name: 'Disney+', color: '#006E99', category: 'Entertainment', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/3/3e/Disney%2B_Hotstar_logo.svg', plans: [{ name: 'Super', price: '899', type: 'Yearly' }, { name: 'Premium', price: '1499', type: 'Yearly' }] },
+  { name: 'Disney+', color: '#006E99', category: 'Entertainment', logoUrl: 'https://cdn.dribbble.com/userupload/26649642/file/still-c7ab4c8c5f565631f3b349abab561838.png', plans: [{ name: 'Super', price: '899', type: 'Yearly' }, { name: 'Premium', price: '1499', type: 'Yearly' }] },
   
   // Gaming
   { name: 'Xbox Pass', color: '#107C10', category: 'Gaming', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/f/f9/Xbox_one_logo.svg', plans: [{ name: 'Ultimate', price: '549', type: 'Monthly' }] },
-  { name: 'PS Plus', color: '#003087', category: 'Gaming', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/0/00/PlayStation_Plus_logo_2022.svg', plans: [{ name: 'Essential', price: '499', type: 'Monthly' }, { name: 'Extra', price: '749', type: 'Monthly' }] },
-  { name: 'Nitro', color: '#5865F2', category: 'Gaming', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/7/73/Discord_Color_Logo.svg', plans: [{ name: 'Nitro', price: '299', type: 'Monthly' }] },
+  { name: 'PS Plus', color: '#003087', category: 'Gaming', logoUrl: 'https://images.seeklogo.com/logo-png/41/1/playstation-plus-logo-png_seeklogo-411713.png', plans: [{ name: 'Essential', price: '499', type: 'Monthly' }, { name: 'Extra', price: '749', type: 'Monthly' }] },
+  { name: 'Nitro', color: '#5865F2', category: 'Gaming', logoUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTYr0_EghY8vQv58_GOM0wzMc6Hobu7yiOQhA&s', plans: [{ name: 'Nitro', price: '299', type: 'Monthly' }] },
   
   // Education
   { name: 'Duolingo', color: '#58CC02', category: 'Education', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/1/15/Duolingo_logo_%282019%29.svg', plans: [{ name: 'Super', price: '129', type: 'Monthly' }] },
