@@ -68,16 +68,5 @@
 <body class="mesh-bg text-slate-900 overflow-x-hidden">
     <div id="root"></div>
     <script type="module" src="index.tsx"></script>
-    <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js').then(reg => {
-                    console.log('SW registered');
-                }).catch(err => {
-                    console.log('SW registration failed:', err);
-                });
-            });
-        }
-    </script>
 </body>
 </html>
