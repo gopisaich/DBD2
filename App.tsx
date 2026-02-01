@@ -114,6 +114,7 @@ const App: React.FC = () => {
     if (!sub || !isOnline) return;
 
     try {
+      // Initialize Gemini SDK with the API key from environment variables
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
@@ -121,7 +122,14 @@ const App: React.FC = () => {
         config: { tools: [{ googleSearch: {} }] }
       });
 
+      // Directly access the .text property as per GenerateContentResponse guidelines
       const url = response.text?.trim();
+      
+      // Compliance: Always check and handle grounding metadata when using Google Search
+      if (response.candidates?.[0]?.groundingMetadata?.groundingChunks) {
+        console.debug('Logo search sources:', response.candidates[0].groundingMetadata.groundingChunks);
+      }
+
       if (url && url.startsWith('http')) {
         setSubscriptions(prev => prev.map(s => s.id === subId ? { ...s, logoUrl: url } : s));
         vibrate(20);
@@ -220,16 +228,20 @@ const App: React.FC = () => {
     vibrate(12);
     setIsLoadingAdvice(true);
     try {
+      // Re-initialize for fresh request handling
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const subList = activeSubscriptions.map(s => `${s.name}: ₹${s.price}`).join(', ');
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: `My subscriptions: ${subList}. Give a short, 1-sentence witty money-saving advice for an Indian user. Keep it brief.`,
-        config: { thinkingConfig: { thinkingBudget: 0 } }
+        config: { 
+          thinkingConfig: { thinkingBudget: 0 } // Disabling thinking for lower latency on simple text tasks
+        }
       });
-      setGeminiAdvice(response.text);
+      // Correct property access for extracted text content
+      setGeminiAdvice(response.text || "Budget wisely and save more!");
     } catch (err) {
-      console.error(err);
+      console.error('Gemini Advice error:', err);
     } finally {
       setIsLoadingAdvice(false);
     }
